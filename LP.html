@@ -1911,6 +1911,16 @@
             .guarantee-badge {
                 justify-content: center;
             }
+
+            /* Descer scroll no mobile */
+            .scroll-indicator {
+                top: 92vh;
+            }
+
+            /* Ocultar cursor e botão de som no mobile */
+            #cursor-wrapper, .sound-toggle {
+                display: none !important;
+            }
         }
 
         /* Para telas muito pequenas, preços em 1 coluna */
@@ -1953,7 +1963,7 @@
     <!-- Video Hero Section -->
     <section class="hero" id="hero-section">
         <video autoplay muted loop playsinline class="hero-video" id="hero-video">
-            <source src="TEMPESTGA_1.mp4" type="video/mp4">
+            <source src="TEMPESTGA_1_1.mp4" type="video/mp4">
         </video>
         <div class="hero-overlay" id="hero-overlay"></div>
         <div class="blur-divider"></div>
@@ -2158,7 +2168,7 @@
 
         <!-- Single shared background: video + orbs + scanlines -->
         <video class="dark-zone-video" autoplay muted loop playsinline>
-            <source src="GettyImages-1175527957.mp4" type="video/mp4">
+            <source src="GettyImages-1175527957_1.mp4" type="video/mp4">
         </video>
         <div class="dark-zone-fade"></div>
         <div class="dz-orb-1"></div>
@@ -2576,19 +2586,31 @@
 
         const triggers = ['click', 'scroll', 'mousemove', 'touchstart', 'wheel', 'mousedown'];
         triggers.forEach(trigger => {
-            window.addEventListener(trigger, handleInteraction);
+            window.addEventListener(trigger, handleInteraction, {passive: true});
         });
 
-        soundToggle.addEventListener('click', (e) => {
-            e.stopPropagation(); // Prevent trigger multiple startMusic
-            if (bgMusic.paused) {
-                startMusic();
-            } else {
-                bgMusic.pause();
-                soundToggle.classList.add('muted');
-                isMusicPlaying = false;
-                userWasPlaying = true; // Still true because user interacted
-            }
+        // Better handling for mobile touch vs click
+        ['click', 'touchstart'].forEach(evt => {
+            soundToggle.addEventListener(evt, (e) => {
+                e.stopPropagation();
+                if (e.type === 'touchstart') e.preventDefault(); // prevent duplicate click event
+                
+                if (bgMusic.paused) {
+                    // Try to play directly within user interaction context
+                    bgMusic.play().then(() => {
+                        bgMusic.volume = 0.9;
+                        if (bgMusic.currentTime < 4) bgMusic.currentTime = 4;
+                        soundToggle.classList.remove('muted');
+                        isMusicPlaying = true;
+                        userWasPlaying = true;
+                    }).catch(err => console.log('Audio error:', err));
+                } else {
+                    bgMusic.pause();
+                    soundToggle.classList.add('muted');
+                    isMusicPlaying = false;
+                    userWasPlaying = true;
+                }
+            }, {passive: false});
         });
 
         // Visibility API: Pause on tab change
@@ -2621,16 +2643,17 @@
                 }
                 heroContent.style.opacity = Math.max(opacity, 0);
                 
-                // Also fade indicators out
+                // Also fade indicators out slower
                 const scrollIndicator = document.getElementById('scroll-indicator');
-                if (scrollIndicator) scrollIndicator.style.opacity = Math.max(1 - (scroll / 200), 0);
-                if (soundToggle) soundToggle.style.opacity = Math.max(1 - (scroll / 200), 0);
+                if (scrollIndicator) scrollIndicator.style.opacity = Math.max(1 - (scroll / 500), 0);
+                // Keep sound toggle at least slightly visible or fade slower
+                if (soundToggle) soundToggle.style.opacity = Math.max(1 - (scroll / 500), 0.3);
                 
                 // Volume fade logic
                 if (isMusicPlaying) {
                     let volFadeEnd = windowHeight * 1.2;
-                    let fadeAmount = 1 - (scroll / volFadeEnd);
-                    bgMusic.volume = Math.max(0, Math.min(0.9, 0.9 * fadeAmount));
+                    let fadeAmount = Math.max(1 - (scroll / volFadeEnd), 0);
+                    bgMusic.volume = 0.9 * fadeAmount;
                 }
 
                 heroContent.style.pointerEvents = opacity <= 0 ? 'none' : 'all';
